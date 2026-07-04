@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YawarSur - Sistema de Gestión de Banco de Sangre</title>
+<style>
+  :root{
+    --rojo: #B22234;
+    --rojo-oscuro: #8C1C29;
+    --sidebar: #7A1F2B;
+    --sidebar-activo: #9C2A38;
+    --azul: #1F6FB2;
+    --bg: #F4F6F8;
+    --card: #FFFFFF;
+    --texto: #2B2B2B;
+    --muted: #6B7280;
+    --ok: #2E7D32;
+    --warn: #C77700;
+    --danger: #C0392B;
+    --borde: #E2E5E9;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI', Arial, sans-serif;
+    background:var(--bg); color:var(--texto);
+  }
+  /* ---------- LAYOUT ---------- */
+  #app{ display:flex; min-height:100vh; }
+  #sidebar{
+    width:250px; background:var(--sidebar); color:white;
+    display:flex; flex-direction:column; flex-shrink:0;
+    position:fixed; top:0; left:0; bottom:0;
+  }
+  #sidebar .logo{ text-align:center; padding:22px 10px 4px; font-size:20px; font-weight:700; }
+  #sidebar .hosp-name{ text-align:center; font-size:12px; color:#E4B9BE; padding:0 14px 18px; }
+  #sidebar nav{ flex:1; overflow-y:auto; }
+  #sidebar button.menu-item{
+    display:block; width:100%; text-align:left; background:none; border:none;
+    color:white; padding:12px 20px; font-size:14px; cursor:pointer;
+  }
+  #sidebar button.menu-item:hover{ background:var(--sidebar-activo); }
+  #sidebar button.menu-item.activo{ background:var(--sidebar-activo); font-weight:600; }
+  #sidebar .salir{
+    background:#5A1620; padding:14px 20px; border:none; color:white; cursor:pointer; font-size:14px;
+  }
+  #sidebar .salir:hover{ background:#40101A; }
+
+  #main{ margin-left:250px; flex:1; display:flex; flex-direction:column; min-width:0; }
+  header{
+    background:white; padding:18px 28px; border-bottom:1px solid var(--borde);
+    display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:6px;
+  }
+  header h1{ margin:0 0 4px; font-size:22px; }
+  header .fecha{ color:var(--muted); font-size:13px; }
+  header .sedes-info{ color:var(--muted); font-size:13px; text-align:right; }
+
+  #contenido{ padding:26px 28px; flex:1; overflow-y:auto; }
+  .pagina{ display:none; }
+  .pagina.activa{ display:block; }
+
+  /* ---------- CARDS ---------- */
+  .card{
+    background:var(--card); border:1px solid var(--borde); border-radius:6px;
+    padding:20px 24px; margin-bottom:18px;
+  }
+  .card h2{ margin:0 0 14px; font-size:16px; color:var(--rojo); }
+  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; }
+  .stat-card{
+    background:var(--card); border:1px solid var(--borde); border-radius:6px;
+    padding:16px 18px;
+  }
+  .stat-card .icono{ font-size:18px; }
+  .stat-card .valor{ font-size:26px; font-weight:700; color:var(--rojo); margin:8px 0 2px; }
+  .stat-card .valor.critico{ color:var(--danger); }
+  .stat-card .etiqueta{ font-size:12px; color:var(--muted); }
+
+  /* ---------- FORMS ---------- */
+  .form-row{ display:flex; align-items:center; gap:14px; margin-bottom:12px; flex-wrap:wrap; }
+  .form-row label{ width:220px; font-size:13px; }
+  .form-row input, .form-row select{
+    flex:1; min-width:200px; padding:8px 10px; border:1px solid #C9CDD3; border-radius:4px; font-size:13px;
+  }
+  .btn{
+    display:inline-block; background:var(--rojo); color:white; border:none; padding:10px 22px;
+    border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .btn:hover{ background:var(--rojo-oscuro); }
+  .btn.ok{ background:var(--ok); } .btn.ok:hover{ background:#225A26; }
+  .btn.warn{ background:var(--warn); } .btn.warn:hover{ background:#9E5E00; }
+  .btn.azul{ background:var(--azul); } .btn.azul:hover{ background:#175A90; }
+
+  /* ---------- TABLES ---------- */
+  table{ width:100%; border-collapse:collapse; background:white; }
+  table th{ background:var(--rojo); color:white; padding:10px; font-size:12px; text-align:left; }
+  table td{ padding:9px 10px; border-bottom:1px solid var(--borde); font-size:13px; }
+  table tr:nth-child(even){ background:#FAFAFB; }
+  .tabla-wrap{ max-height:360px; overflow-y:auto; border:1px solid var(--borde); border-radius:6px; }
+  .sin-datos{ color:var(--muted); font-size:13px; padding:14px; }
+
+  /* ---------- ALERTS / CHIPS ---------- */
+  .alerta-item{
+    display:flex; align-items:center; gap:16px; background:white; border:1px solid var(--borde);
+    border-left:5px solid var(--danger); border-radius:6px; padding:12px 18px; margin-bottom:8px;
+  }
+  .alerta-item .tipo{ font-weight:700; color:var(--danger); }
+  .chip{
+    display:inline-block; background:var(--azul); color:white; padding:8px 16px; border-radius:4px;
+    font-weight:700; margin:4px 6px 4px 0;
+  }
+
+  /* ---------- MODAL CONFIGURACION ---------- */
+  #modal-config{
+    position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:999;
+  }
+  #modal-config .box{
+    background:white; width:520px; max-width:92vw; max-height:88vh; overflow-y:auto; border-radius:8px;
+  }
+  #modal-config .box-header{
+    background:var(--rojo); color:white; padding:20px 24px; border-radius:8px 8px 0 0; text-align:center;
+  }
+  #modal-config .box-header h2{ margin:0; font-size:22px; }
+  #modal-config .box-header p{ margin:4px 0 0; color:#F6DADD; font-size:13px; }
+  #modal-config .box-body{ padding:22px 26px; }
+  #modal-config label{ font-weight:600; font-size:13px; display:block; margin:12px 0 6px; }
+  #modal-config input[type=text]{
+    width:100%; padding:9px 10px; border:1px solid #C9CDD3; border-radius:4px; font-size:13px;
+  }
+  .radio-group label{ display:inline-block; font-weight:normal; margin-right:20px; }
+  .sede-block{ border:1px solid var(--borde); border-radius:6px; padding:10px 14px; margin-bottom:10px; }
+  .sede-block .titulo{ font-weight:600; font-size:13px; margin-bottom:6px; }
+  .oculto{ display:none !important; }
+  .error-msg{ color:var(--danger); font-size:12px; margin-top:4px; min-height:16px; }
+</style>
+</head>
+<body>
+
+<!-- ================= MODAL DE CONFIGURACIÓN INICIAL ================= -->
+<div id="modal-config">
+  <div class="box">
+    <div class="box-header">
+      <h2>🩸 YAWARSUR</h2>
+      <p>Configuración del hospital</p>
+    </div>
+    <div class="box-body">
+      <label>Nombre del hospital</label>
+      <input type="text" id="cfg-hospital" placeholder="Ej. Hospital Nacional YawarSur">
+
+      <label>¿El hospital tiene sedes?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="cfg-tiene-sedes" value="si" onchange="actualizarPanelSedes()"> Sí</label>
+        <label><input type="radio" name="cfg-tiene-sedes" value="no" checked onchange="actualizarPanelSedes()"> No</label>
+      </div>
+
+      <div id="cfg-cantidad-wrap" class="oculto" style="margin-top:10px;">
+        <label>¿Cuántas sedes tiene?</label>
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="cfg-cantidad-sedes" style="width:80px;">
+          <button class="btn azul" onclick="generarCamposSede()">Generar campos</button>
+        </div>
+      </div>
+
+      <div id="cfg-sedes-lista" style="margin-top:14px;"></div>
+
+      <div class="error-msg" id="cfg-error"></div>
+      <button class="btn" style="width:100%; margin-top:16px; padding:12px;" onclick="confirmarConfiguracion()">Iniciar sistema →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APLICACIÓN PRINCIPAL ================= -->
+<div id="app" class="oculto">
+  <div id="sidebar">
+    <div class="logo">🩸 YawarSur</div>
+    <div class="hosp-name" id="sb-hospital"></div>
+    <nav id="sb-menu"></nav>
+    <button class="salir" onclick="salir()">🚪 Salir</button>
+  </div>
+
+  <div id="main">
+    <header>
+      <div>
+        <h1 id="titulo-pagina">Inventario de sangre</h1>
+        <div class="fecha" id="fecha-actual"></div>
+      </div>
+      <div class="sedes-info" id="sedes-info"></div>
+    </header>
+    <div id="contenido"></div>
+  </div>
+</div>
+
+<script>
+// ==========================================================
+// VARIABLES GLOBALES (idénticas al programa original en Python)
+// ==========================================================
+let hospital = {};
+let sedes = [];
+let donaciones = [];
+let transfusiones = [];
+let historial_medico = [];
+let citas = [];
+
+const TIPOS_SANGRE = ["A+","A-","B+","B-","AB+","AB-","O+","O-"];
+
+let inventario = {
+  "A+":0, "A-":0, "B+":0, "B-":0, "AB+":0, "AB-":0, "O+":0, "O-":0
+};
+
+const COMPATIBILIDAD = {
+  "O-":  ["O-"],
+  "O+":  ["O+","O-"],
+  "A-":  ["A-","O-"],
+  "A+":  ["A+","A-","O+","O-"],
+  "B-":  ["B-","O-"],
+  "B+":  ["B+","B-","O+","O-"],
+  "AB-": ["AB-","A-","B-","O-"],
+  "AB+": ["A+","A-","B+","B-","AB+","AB-","O+","O-"],
+};
+
+// ==========================================================
+// LÓGICA DE NEGOCIO (misma lógica que el sistema de consola)
+// ==========================================================
+function fechaHoraActual(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fechaHoraISO(){
+  return new Date().toISOString();
+}
+
+function logicaRegistrarDonacion(nombre, apellido, tipo_sangre, cantidad){
+  const donante = { nombre, apellido, tipo_sangre, cantidad, fecha: fechaHoraISO() };
+  donaciones.push(donante);
+  inventario[tipo_sangre] += cantidad;
+}
+
+function logicaRegistrarTransfusion(nombre, apellido, diagnostico, tipo_sangre, cantidad, prioridad){
+  const paciente = { nombre, apellido, diagnostico, tipo_sangre, cantidad, prioridad, fecha: fechaHoraISO() };
+  if (inventario[tipo_sangre] >= cantidad){
+    inventario[tipo_sangre] -= cantidad;
+    transfusiones.push(paciente);
+    historial_medico.push(paciente);
+    return true;
+  }
+  return false;
+}
+
+function logicaAgregarSangre(tipo, cantidad){ inventario[tipo] += cantidad; }
+
+function logicaUsarSangre(tipo, cantidad){
+  if (inventario[tipo] >= cantidad){ inventario[tipo] -= cantidad; return true; }
+  return false;
+}
+
+function logicaAlertas(){
+  const alertas = [];
+  for (const tipo of TIPOS_SANGRE){
+    if (inventario[tipo] <= 3) alertas.push([tipo, inventario[tipo]]);
+  }
+  return alertas;
+}
+
+function logicaCompatibilidad(tipo){ return COMPATIBILIDAD[tipo]; }
+
+function logicaRegistrarCita(nombre, fecha, sede){ citas.push({ nombre, fecha, sede }); }
+
+function logicaPrioritarios(){ return transfusiones.filter(p => p.prioridad === "alta"); }
+
+function logicaExportarDatos(){
+  return {
+    hospital, sedes, donaciones, transfusiones,
+    historial: historial_medico, inventario, citas
+  };
+}
+
+// ==========================================================
+// VALIDACIONES (equivalentes a pedir_texto, pedir_entero, etc.)
+// ==========================================================
+function validarTexto(valor, campo="Campo"){
+  valor = (valor||"").trim();
+  if (valor === ""){ alert(`❌ ${campo} no puede estar vacío.`); return null; }
+  return valor;
+}
+function validarEnteroPositivo(valor, campo="Cantidad"){
+  const n = parseInt(valor, 10);
+  if (isNaN(n) || String(n) !== String(valor).trim()){
+    alert(`❌ ${campo} debe ser un número válido.`); return null;
+  }
+  if (n <= 0){ alert(`❌ ${campo} debe ser mayor a 0.`); return null; }
+  return n;
+}
+function validarTipoSangre(valor){
+  const t = (valor||"").trim().toUpperCase();
+  if (TIPOS_SANGRE.includes(t)) return t;
+  alert("❌ Tipo de sangre inválido."); return null;
+}
+function validarPrioridad(valor){
+  const p = (valor||"").trim().toLowerCase();
+  if (["alta","media","baja"].includes(p)) return p;
+  alert("❌ Prioridad inválida."); return null;
+}
+
+// ==========================================================
+// CONFIGURACIÓN INICIAL (equivale a configurar_hospital)
+// ==========================================================
+function actualizarPanelSedes(){
+  const tiene = document.querySelector('input[name=cfg-tiene-sedes]:checked').value;
+  document.getElementById("cfg-cantidad-wrap").classList.toggle("oculto", tiene !== "si");
+  if (tiene !== "si"){
+    document.getElementById("cfg-sedes-lista").innerHTML = "";
+  }
+}
+
+function generarCamposSede(){
+  const cantidad = validarEnteroPositivo(document.getElementById("cfg-cantidad-sedes").value, "Cantidad de sedes");
+  if (cantidad === null) return;
+  const cont = document.getElementById("cfg-sedes-lista");
+  cont.innerHTML = "";
+  for (let i=0; i<cantidad; i++){
+    const div = document.createElement("div");
+    div.className = "sede-block";
+    div.innerHTML = `
+      <div class="titulo">🏢 Sede ${i+1}</div>
+      <input type="text" placeholder="Nombre de la sede" class="cfg-sede-nombre" style="margin-bottom:6px;">
+      <input type="text" placeholder="Dirección de la sede" class="cfg-sede-direccion">
+    `;
+    cont.appendChild(div);
+  }
+}
+
+function confirmarConfiguracion(){
+  const errBox = document.getElementById("cfg-error");
+  errBox.textContent = "";
+  const nombreHosp = validarTexto(document.getElementById("cfg-hospital").value, "Nombre del hospital");
+  if (nombreHosp === null) return;
+  hospital.nombre = nombreHosp;
+
+  const tiene = document.querySelector('input[name=cfg-tiene-sedes]:checked').value;
+  if (tiene === "si"){
+    const nombres = document.querySelectorAll(".cfg-sede-nombre");
+    const direcciones = document.querySelectorAll(".cfg-sede-direccion");
+    if (nombres.length === 0){
+      alert("❌ Genere los campos de sede antes de continuar.");
+      return;
+    }
+    const nuevasSedes = [];
+    for (let i=0; i<nombres.length; i++){
+      const n = validarTexto(nombres[i].value, "Nombre de la sede");
+      if (n === null) return;
+      const d = validarTexto(direcciones[i].value, "Dirección de la sede");
+      if (d === null) return;
+      nuevasSedes.push({ nombre:n, direccion:d });
+    }
+    sedes.push(...nuevasSedes);
+  }
+
+  document.getElementById("modal-config").classList.add("oculto");
+  document.getElementById("app").classList.remove("oculto");
+  construirInterfaz();
+}
+
+// ==========================================================
+// CONSTRUCCIÓN DE LA INTERFAZ PRINCIPAL
+// ==========================================================
+const MENU_ITEMS = [
+  ["🩸","Registrar donación","donacion"],
+  ["💉","Registrar transfusión","transfusion"],
+  ["📦","Inventario de sangre","inventario"],
+  ["➕","Agregar sangre","agregar"],
+  ["➖","Usar sangre","usar"],
+  ["⚠","Alerta de escasez","alerta"],
+  ["🔄","Compatibilidad sanguínea","compatibilidad"],
+  ["📋","Historial médico","historial"],
+  ["📅","Registrar cita","cita"],
+  ["⭐","Pacientes prioritarios","prioritarios"],
+  ["📊","Reporte general","reporte"],
+  ["🏥","Hospital y sedes","hospital"],
+  ["💾","Exportar datos","exportar"],
+];
+
+const TITULOS = {
+  donacion:"Registro de donación", transfusion:"Registro de transfusión",
+  inventario:"Inventario de sangre", agregar:"Agregar bolsas de sangre",
+  usar:"Usar bolsas de sangre", alerta:"Alerta de escasez",
+  compatibilidad:"Compatibilidad sanguínea", historial:"Historial médico",
+  cita:"Registro de cita de donación", prioritarios:"Pacientes prioritarios",
+  reporte:"Reporte general del sistema", hospital:"Hospital y sedes",
+  exportar:"Exportar datos del sistema"
+};
+
+function construirInterfaz(){
+  document.getElementById("sb-hospital").textContent = hospital.nombre || "";
+  document.getElementById("fecha-actual").textContent = "📅 " + fechaHoraActual();
+  actualizarSedesInfo();
+
+  const nav = document.getElementById("sb-menu");
+  nav.innerHTML = "";
+  MENU_ITEMS.forEach(([icono, texto, clave]) => {
+    const b = document.createElement("button");
+    b.className = "menu-item";
+    b.id = "menu-" + clave;
+    b.textContent = `${icono}  ${texto}`;
+    b.onclick = () => mostrarPagina(clave);
+    nav.appendChild(b);
+  });
+
+  const contenido = document.getElementById("contenido");
+  contenido.innerHTML = `
+    ${plantillaDonacion()}
+    ${plantillaTransfusion()}
+    ${plantillaInventario()}
+    ${plantillaAgregar()}
+    ${plantillaUsar()}
+    ${plantillaAlerta()}
+    ${plantillaCompatibilidad()}
+    ${plantillaHistorial()}
+    ${plantillaCita()}
+    ${plantillaPrioritarios()}
+    ${plantillaReporte()}
+    ${plantillaHospital()}
+    ${plantillaExportar()}
+  `;
+
+  mostrarPagina("inventario");
+}
+
+function actualizarSedesInfo(){
+  const info = sedes.length > 0 ? `${sedes.length} sede(s) registrada(s)` : "Sin sedes registradas";
+  document.getElementById("sedes-info").textContent = "🏢 " + info;
+}
+
+function mostrarPagina(clave){
+  document.querySelectorAll(".pagina").forEach(p => p.classList.remove("activa"));
+  document.getElementById("pagina-" + clave).classList.add("activa");
+  document.getElementById("titulo-pagina").textContent = TITULOS[clave];
+  document.querySelectorAll(".menu-item").forEach(b => b.classList.remove("activo"));
+  document.getElementById("menu-" + clave).classList.add("activo");
+  const refrescar = window["refrescar_" + clave];
+  if (typeof refrescar === "function") refrescar();
+}
+
+function salir(){
+  if (confirm("¿Desea cerrar YawarSur?\n\nGracias por utilizar YawarSur. Esperamos seguir contribuyendo al cuidado y bienestar de sus pacientes.")){
+    document.getElementById("app").innerHTML = `
+      <div style="margin:auto; text-align:center; padding:60px; font-family:'Segoe UI'; width:100%;">
+        <h1>👋 Gracias por utilizar YawarSur</h1>
+        <p style="color:#6B7280;">Esperamos seguir contribuyendo al cuidado y bienestar de sus pacientes.</p>
+      </div>`;
+  }
+}
+
+function opcionesSelect(valores, placeholder){
+  let html = `<option value="">${placeholder}</option>`;
+  valores.forEach(v => html += `<option value="${v}">${v}</option>`);
+  return html;
+}
+
+// ==========================================================
+// PÁGINA: REGISTRAR DONACIÓN
+// ==========================================================
+function plantillaDonacion(){
+  return `
+  <div class="pagina" id="pagina-donacion">
+    <div class="card">
+      <h2>Nuevo registro de donación</h2>
+      <div class="form-row"><label>Nombre:</label><input id="d-nombre" type="text"></div>
+      <div class="form-row"><label>Apellido:</label><input id="d-apellido" type="text"></div>
+      <div class="form-row"><label>Tipo de sangre:</label>
+        <select id="d-tipo">${opcionesSelect(TIPOS_SANGRE, "Seleccione...")}</select></div>
+      <div class="form-row"><label>Cantidad de bolsas:</label><input id="d-cantidad" type="text"></div>
+      <button class="btn" onclick="accionDonacion()">Registrar donación</button>
+    </div>
+    <h3 style="font-size:14px;">Donaciones registradas</h3>
+    <div class="tabla-wrap">
+      <table><thead><tr><th>Nombre</th><th>Apellido</th><th>Tipo</th><th>Cantidad</th><th>Fecha</th></tr></thead>
+      <tbody id="tabla-donaciones"></tbody></table>
+    </div>
+  </div>`;
+}
+function accionDonacion(){
+  const nombre = validarTexto(document.getElementById("d-nombre").value, "Nombre");
+  if (nombre === null) return;
+  const apellido = validarTexto(document.getElementById("d-apellido").value, "Apellido");
+  if (apellido === null) return;
+  const tipo = validarTipoSangre(document.getElementById("d-tipo").value);
+  if (tipo === null) return;
+  const cantidad = validarEnteroPositivo(document.getElementById("d-cantidad").value, "Cantidad de bolsas");
+  if (cantidad === null) return;
+
+  logicaRegistrarDonacion(nombre, apellido, tipo, cantidad);
+  alert("✅ Donación registrada correctamente.");
+  document.getElementById("d-nombre").value = "";
+  document.getElementById("d-apellido").value = "";
+  document.getElementById("d-tipo").value = "";
+  document.getElementById("d-cantidad").value = "";
+  refrescar_donacion();
+  refrescar_inventario();
+}
+function refrescar_donacion(){
+  const tbody = document.getElementById("tabla-donaciones");
+  tbody.innerHTML = donaciones.map(d => `
+    <tr><td>${d.nombre}</td><td>${d.apellido}</td><td>${d.tipo_sangre}</td><td>${d.cantidad}</td>
+    <td>${new Date(d.fecha).toLocaleString()}</td></tr>`).join("")
+    || `<tr><td colspan="5" class="sin-datos">Sin donaciones registradas.</td></tr>`;
+}
+
+// ==========================================================
+// PÁGINA: REGISTRAR TRANSFUSIÓN
+// ==========================================================
+function plantillaTransfusion(){
+  return `
+  <div class="pagina" id="pagina-transfusion">
+    <div class="card">
+      <h2>Nuevo registro de transfusión</h2>
+      <div class="form-row"><label>Nombre del paciente:</label><input id="t-nombre" type="text"></div>
+      <div class="form-row"><label>Apellido:</label><input id="t-apellido" type="text"></div>
+      <div class="form-row"><label>Diagnóstico:</label><input id="t-diagnostico" type="text"></div>
+      <div class="form-row"><label>Tipo de sangre:</label>
+        <select id="t-tipo">${opcionesSelect(TIPOS_SANGRE, "Seleccione...")}</select></div>
+      <div class="form-row"><label>Cantidad requerida:</label><input id="t-cantidad" type="text"></div>
+      <div class="form-row"><label>Prioridad:</label>
+        <select id="t-prioridad">${opcionesSelect(["alta","media","baja"], "Seleccione...")}</select></div>
+      <button class="btn" onclick="accionTransfusion()">Registrar transfusión</button>
+    </div>
+    <h3 style="font-size:14px;">Transfusiones registradas</h3>
+    <div class="tabla-wrap">
+      <table><thead><tr><th>Paciente</th><th>Diagnóstico</th><th>Tipo</th><th>Cantidad</th><th>Prioridad</th><th>Fecha</th></tr></thead>
+      <tbody id="tabla-transfusiones"></tbody></table>
+    </div>
+  </div>`;
+}
+function accionTransfusion(){
+  const nombre = validarTexto(document.getElementById("t-nombre").value, "Nombre del paciente");
+  if (nombre === null) return;
+  const apellido = validarTexto(document.getElementById("t-apellido").value, "Apellido");
+  if (apellido === null) return;
+  const diagnostico = validarTexto(document.getElementById("t-diagnostico").value, "Diagnóstico");
+  if (diagnostico === null) return;
+  const tipo = validarTipoSangre(document.getElementById("t-tipo").value);
+  if (tipo === null) return;
+  const cantidad = validarEnteroPositivo(document.getElementById("t-cantidad").value, "Cantidad requerida");
+  if (cantidad === null) return;
+  const prioridad = validarPrioridad(document.getElementById("t-prioridad").value);
+  if (prioridad === null) return;
+
+  const exito = logicaRegistrarTransfusion(nombre, apellido, diagnostico, tipo, cantidad, prioridad);
+  if (exito){
+    alert("✅ Transfusión realizada correctamente.");
+    ["t-nombre","t-apellido","t-diagnostico","t-cantidad"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("t-tipo").value = "";
+    document.getElementById("t-prioridad").value = "";
+  } else {
+    alert("❌ No hay suficientes bolsas disponibles.");
+  }
+  refrescar_transfusion();
+  refrescar_inventario();
+}
+function refrescar_transfusion(){
+  const tbody = document.getElementById("tabla-transfusiones");
+  tbody.innerHTML = transfusiones.map(p => `
+    <tr><td>${p.nombre} ${p.apellido}</td><td>${p.diagnostico}</td><td>${p.tipo_sangre}</td>
+    <td>${p.cantidad}</td><td>${p.prioridad}</td><td>${new Date(p.fecha).toLocaleString()}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="sin-datos">Sin transfusiones registradas.</td></tr>`;
+}
+
+// ==========================================================
+// PÁGINA: INVENTARIO
+// ==========================================================
+function plantillaInventario(){
+  return `
+  <div class="pagina" id="pagina-inventario">
+    <div class="stat-grid" id="grid-inventario"></div>
+  </div>`;
+}
+function refrescar_inventario(){
+  const grid = document.getElementById("grid-inventario");
+  grid.innerHTML = TIPOS_SANGRE.map(tipo => {
+    const critico = inventario[tipo] <= 3;
+    return `
+    <div class="stat-card">
+      <div class="icono">🩸</div>
+      <div class="valor ${critico ? "critico" : ""}">${inventario[tipo]} bolsas</div>
+      <div class="etiqueta">${tipo}</div>
+    </div>`;
+  }).join("");
+}
+
+// ==========================================================
+// PÁGINA: AGREGAR SANGRE
+// ==========================================================
+function plantillaAgregar(){
+  return `
+  <div class="pagina" id="pagina-agregar">
+    <div class="card">
+      <h2>Agregar bolsas al inventario</h2>
+      <div class="form-row"><label>Tipo de sangre:</label>
+        <select id="a-tipo">${opcionesSelect(TIPOS_SANGRE, "Seleccione...")}</select></div>
+      <div class="form-row"><label>Cantidad a agregar:</label><input id="a-cantidad" type="text"></div>
+      <button class="btn ok" onclick="accionAgregar()">Agregar sangre</button>
+    </div>
+  </div>`;
+}
+function accionAgregar(){
+  const tipo = validarTipoSangre(document.getElementById("a-tipo").value);
+  if (tipo === null) return;
+  const cantidad = validarEnteroPositivo(document.getElementById("a-cantidad").value, "Cantidad a agregar");
+  if (cantidad === null) return;
+  logicaAgregarSangre(tipo, cantidad);
+  alert("✅ Inventario actualizado correctamente.");
+  document.getElementById("a-tipo").value = "";
+  document.getElementById("a-cantidad").value = "";
+  refrescar_inventario();
+}
+
+// ==========================================================
+// PÁGINA: USAR SANGRE
+// ==========================================================
+function plantillaUsar(){
+  return `
+  <div class="pagina" id="pagina-usar">
+    <div class="card">
+      <h2>Usar bolsas del inventario</h2>
+      <div class="form-row"><label>Tipo de sangre:</label>
+        <select id="u-tipo">${opcionesSelect(TIPOS_SANGRE, "Seleccione...")}</select></div>
+      <div class="form-row"><label>Cantidad a utilizar:</label><input id="u-cantidad" type="text"></div>
+      <button class="btn warn" onclick="accionUsar()">Usar sangre</button>
+    </div>
+  </div>`;
+}
+function accionUsar(){
+  const tipo = validarTipoSangre(document.getElementById("u-tipo").value);
+  if (tipo === null) return;
+  const cantidad = validarEnteroPositivo(document.getElementById("u-cantidad").value, "Cantidad a utilizar");
+  if (cantidad === null) return;
+  if (logicaUsarSangre(tipo, cantidad)){
+    alert("✅ Sangre utilizada correctamente.");
+    document.getElementById("u-tipo").value = "";
+    document.getElementById("u-cantidad").value = "";
+  } else {
+    alert("❌ No existe suficiente inventario.");
+  }
+  refrescar_inventario();
+}
+
+// ==========================================================
+// PÁGINA: ALERTA DE ESCASEZ
+// ==========================================================
+function plantillaAlerta(){
+  return `<div class="pagina" id="pagina-alerta"><div id="lista-alertas"></div></div>`;
+}
+function refrescar_alerta(){
+  const cont = document.getElementById("lista-alertas");
+  const alertas = logicaAlertas();
+  if (alertas.length === 0){
+    cont.innerHTML = `<div class="card"><h2 style="color:var(--ok);">✅ No existen alertas actualmente.</h2></div>`;
+    return;
+  }
+  cont.innerHTML = alertas.map(([tipo, cantidad]) => `
+    <div class="alerta-item">
+      <div class="tipo">⚠ Tipo ${tipo}</div>
+      <div style="color:var(--muted);">Únicamente ${cantidad} bolsa(s) disponibles</div>
+    </div>`).join("");
+}
+
+// ==========================================================
+// PÁGINA: COMPATIBILIDAD SANGUÍNEA
+// ==========================================================
+function plantillaCompatibilidad(){
+  return `
+  <div class="pagina" id="pagina-compatibilidad">
+    <div class="card">
+      <h2>Consultar compatibilidad</h2>
+      <div class="form-row"><label>Tipo de sangre del paciente:</label>
+        <select id="c-tipo">${opcionesSelect(TIPOS_SANGRE, "Seleccione...")}</select></div>
+      <button class="btn azul" onclick="accionCompatibilidad()">Consultar</button>
+    </div>
+    <div id="resultado-compat"></div>
+  </div>`;
+}
+function accionCompatibilidad(){
+  const tipo = validarTipoSangre(document.getElementById("c-tipo").value);
+  if (tipo === null) return;
+  const compatibles = logicaCompatibilidad(tipo);
+  document.getElementById("resultado-compat").innerHTML = `
+    <div class="card">
+      <p><strong>El paciente con tipo ${tipo} puede recibir sangre de:</strong></p>
+      ${compatibles.map(s => `<span class="chip">${s}</span>`).join("")}
+    </div>`;
+}
+
+// ==========================================================
+// PÁGINA: HISTORIAL MÉDICO
+// ==========================================================
+function plantillaHistorial(){
+  return `
+  <div class="pagina" id="pagina-historial">
+    <div class="tabla-wrap" style="max-height:520px;">
+      <table><thead><tr><th>Paciente</th><th>Diagnóstico</th><th>Tipo</th><th>Cantidad</th><th>Prioridad</th><th>Fecha</th></tr></thead>
+      <tbody id="tabla-historial"></tbody></table>
+    </div>
+  </div>`;
+}
+function refrescar_historial(){
+  const tbody = document.getElementById("tabla-historial");
+  tbody.innerHTML = historial_medico.map(p => `
+    <tr><td>${p.nombre} ${p.apellido}</td><td>${p.diagnostico}</td><td>${p.tipo_sangre}</td>
+    <td>${p.cantidad}</td><td>${p.prioridad}</td><td>${new Date(p.fecha).toLocaleString()}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="sin-datos">No existe historial registrado.</td></tr>`;
+}
+
+// ==========================================================
+// PÁGINA: REGISTRAR CITA
+// ==========================================================
+function plantillaCita(){
+  return `
+  <div class="pagina" id="pagina-cita">
+    <div class="card">
+      <h2>Nueva cita de donación</h2>
+      <div class="form-row"><label>Nombre del donante:</label><input id="ci-nombre" type="text"></div>
+      <div class="form-row"><label>Fecha de la cita:</label><input id="ci-fecha" type="text" placeholder="dd/mm/aaaa"></div>
+      <div class="form-row"><label>Sede donde donará:</label>
+        <select id="ci-sede">${opcionesSelect(sedes.map(s=>s.nombre), "Seleccione...")}</select></div>
+      <button class="btn" onclick="accionCita()">Registrar cita</button>
+    </div>
+    <h3 style="font-size:14px;">Citas registradas</h3>
+    <div class="tabla-wrap">
+      <table><thead><tr><th>Donante</th><th>Fecha</th><th>Sede</th></tr></thead>
+      <tbody id="tabla-citas"></tbody></table>
+    </div>
+  </div>`;
+}
+function accionCita(){
+  const nombre = validarTexto(document.getElementById("ci-nombre").value, "Nombre del donante");
+  if (nombre === null) return;
+  const fecha = validarTexto(document.getElementById("ci-fecha").value, "Fecha de la cita");
+  if (fecha === null) return;
+  const sede = validarTexto(document.getElementById("ci-sede").value, "Sede");
+  if (sede === null) return;
+  logicaRegistrarCita(nombre, fecha, sede);
+  alert("✅ Cita registrada correctamente.");
+  document.getElementById("ci-nombre").value = "";
+  document.getElementById("ci-fecha").value = "";
+  document.getElementById("ci-sede").value = "";
+  refrescar_cita();
+}
+function refrescar_cita(){
+  const tbody = document.getElementById("tabla-citas");
+  tbody.innerHTML = citas.map(c => `<tr><td>${c.nombre}</td><td>${c.fecha}</td><td>${c.sede}</td></tr>`).join("")
+    || `<tr><td colspan="3" class="sin-datos">Sin citas registradas.</td></tr>`;
+}
+
+// ==========================================================
+// PÁGINA: PACIENTES PRIORITARIOS
+// ==========================================================
+function plantillaPrioritarios(){
+  return `
+  <div class="pagina" id="pagina-prioritarios">
+    <div class="tabla-wrap" style="max-height:460px;">
+      <table><thead><tr><th>Paciente</th><th>Diagnóstico</th><th>Tipo</th><th>Cantidad</th></tr></thead>
+      <tbody id="tabla-prioritarios"></tbody></table>
+    </div>
+  </div>`;
+}
+function refrescar_prioritarios(){
+  const tbody = document.getElementById("tabla-prioritarios");
+  const prioritarios = logicaPrioritarios();
+  tbody.innerHTML = prioritarios.map(p => `
+    <tr><td>${p.nombre} ${p.apellido}</td><td>${p.diagnostico}</td><td>${p.tipo_sangre}</td><td>${p.cantidad}</td></tr>`).join("")
+    || `<tr><td colspan="4" class="sin-datos">No existen pacientes prioritarios.</td></tr>`;
+}
+
+// ==========================================================
+// PÁGINA: REPORTE GENERAL
+// ==========================================================
+function plantillaReporte(){
+  return `
+  <div class="pagina" id="pagina-reporte">
+    <h2 style="margin-top:0;">🏥 Hospital: <span id="rep-hospital"></span></h2>
+    <div class="stat-grid" style="margin-bottom:18px;">
+      <div class="stat-card"><div class="icono">🏢</div><div class="valor" id="rep-sedes"></div><div class="etiqueta">Número de sedes</div></div>
+      <div class="stat-card"><div class="icono">🩸</div><div class="valor" id="rep-donaciones"></div><div class="etiqueta">Donaciones</div></div>
+      <div class="stat-card"><div class="icono">💉</div><div class="valor" id="rep-transfusiones"></div><div class="etiqueta">Transfusiones</div></div>
+      <div class="stat-card"><div class="icono">📅</div><div class="valor" id="rep-citas"></div><div class="etiqueta">Citas registradas</div></div>
+    </div>
+    <h3 style="font-size:14px;">Inventario de sangre</h3>
+    <div class="tabla-wrap">
+      <table><thead><tr><th>Tipo</th><th>Bolsas disponibles</th></tr></thead>
+      <tbody id="tabla-reporte-inv"></tbody></table>
+    </div>
+  </div>`;
+}
+function refrescar_reporte(){
+  document.getElementById("rep-hospital").textContent = hospital.nombre || "";
+  document.getElementById("rep-sedes").textContent = sedes.length;
+  document.getElementById("rep-donaciones").textContent = donaciones.length;
+  document.getElementById("rep-transfusiones").textContent = transfusiones.length;
+  document.getElementById("rep-citas").textContent = citas.length;
+  document.getElementById("tabla-reporte-inv").innerHTML =
+    TIPOS_SANGRE.map(t => `<tr><td>${t}</td><td>${inventario[t]}</td></tr>`).join("");
+}
+
+// ==========================================================
+// PÁGINA: HOSPITAL Y SEDES
+// ==========================================================
+function plantillaHospital(){
+  return `
+  <div class="pagina" id="pagina-hospital">
+    <div class="card" id="card-hospital-info"></div>
+    <h3 style="font-size:14px;">Sedes registradas</h3>
+    <div id="lista-sedes" style="margin-bottom:16px;"></div>
+    <div class="card">
+      <h2>Agregar nueva sede</h2>
+      <div class="form-row"><label>Nombre de la sede:</label><input id="hs-nombre" type="text"></div>
+      <div class="form-row"><label>Dirección:</label><input id="hs-direccion" type="text"></div>
+      <button class="btn azul" onclick="accionAgregarSede()">Agregar sede</button>
+    </div>
+  </div>`;
+}
+function accionAgregarSede(){
+  const nombre = validarTexto(document.getElementById("hs-nombre").value, "Nombre de la sede");
+  if (nombre === null) return;
+  const direccion = validarTexto(document.getElementById("hs-direccion").value, "Dirección de la sede");
+  if (direccion === null) return;
+  sedes.push({ nombre, direccion });
+  alert("✅ Sede registrada correctamente.");
+  document.getElementById("hs-nombre").value = "";
+  document.getElementById("hs-direccion").value = "";
+  refrescar_hospital();
+  actualizarSedesInfo();
+  // refresca el combo de sedes en la página de citas
+  const selSede = document.getElementById("ci-sede");
+  if (selSede) selSede.innerHTML = opcionesSelect(sedes.map(s=>s.nombre), "Seleccione...");
+}
+function refrescar_hospital(){
+  document.getElementById("card-hospital-info").innerHTML = `
+    <h2>🏥 ${hospital.nombre || ""}</h2>
+    <p style="color:var(--muted); margin:4px 0 0;">${sedes.length} sede(s) registrada(s)</p>`;
+  const lista = document.getElementById("lista-sedes");
+  if (sedes.length === 0){
+    lista.innerHTML = `<p class="sin-datos">Actualmente el hospital no tiene sedes registradas.</p>`;
+  } else {
+    lista.innerHTML = sedes.map((s,i) => `
+      <div class="card" style="padding:12px 18px; margin-bottom:8px;">
+        <strong>${i+1}. ${s.nombre}</strong>
+        <div style="color:var(--muted); font-size:13px;">${s.direccion}</div>
+      </div>`).join("");
+  }
+}
+
+// ==========================================================
+// PÁGINA: EXPORTAR DATOS
+// ==========================================================
+function plantillaExportar(){
+  return `
+  <div class="pagina" id="pagina-exportar">
+    <div class="card">
+      <h2>Exportar datos del sistema</h2>
+      <p style="color:var(--muted); max-width:560px;">
+        Se generará un archivo JSON con toda la información registrada en el sistema
+        (hospital, sedes, donaciones, transfusiones, historial, inventario y citas).
+      </p>
+      <button class="btn ok" onclick="accionExportar()">💾 Exportar a JSON</button>
+    </div>
+  </div>`;
+}
+function accionExportar(){
+  const datos = logicaExportarDatos();
+  const blob = new Blob([JSON.stringify(datos, null, 4)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "yawarsur_datos.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  alert("✅ Datos exportados correctamente.");
+}
+</script>
+</body>
+</html>
